@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.smzdm.core.sectionlayoutmanager.holders.Section;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -53,15 +54,7 @@ public class SectionLayoutManager extends LinearLayoutManager {
     @Override
     public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
         super.onLayoutChildren(recycler, state);
-//        for (int i = 0; i < getChildCount(); i++) {
-//            RecyclerView.ViewHolder vh = getViewHolderByView(getChildAt(i));
-//            int position = vh.getLayoutPosition();
-//            if (vh instanceof Section) {
-//                sectionPositions.add(position);
-//            } else {
-//                sectionPositions.remove(position);
-//            }
-//        }
+        boolean b  = state.isPreLayout();
     }
 
     private void removeAllSections() {
@@ -110,7 +103,8 @@ public class SectionLayoutManager extends LinearLayoutManager {
             removeViewAt(0);
         }
 
-        //检查栈顶 -- 同步状态
+        //检查栈顶 -- 同步状态，在向下滚动（手指下滑）的时候，由于吸顶的ViewHolder都没有进入西东的缓存，所以在向下滚动的
+        //时候RecyclerView会重新创建ViewHolder实例，我们需要将其替换为我们自定义缓存中保存的实例。
         for (RecyclerView.ViewHolder removedViewHolder : sectionCache.clearTop(findFirstVisibleItemPosition())) {
             Log.i(tag, "移除ViewHolder:" + removedViewHolder.toString());
             for (int i = 0; i < getChildCount(); i++) {

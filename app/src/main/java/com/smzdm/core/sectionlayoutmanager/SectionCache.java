@@ -16,7 +16,8 @@ import java.util.Stack;
  */
 public class SectionCache extends Stack<RecyclerView.ViewHolder> {
 
-    private Map<Integer, RecyclerView.ViewHolder> filterMap = new HashMap<>(16, 64);
+    private Map<Integer, RecyclerView.ViewHolder>
+            filterMap = new HashMap<>(16, 64);
 
     @Override
     public RecyclerView.ViewHolder push(RecyclerView.ViewHolder item) {
@@ -42,8 +43,8 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
     }
 
     /**
-     * 栈顶清理
-     * 根据LayoutPosition清理
+     * 栈顶清理，在快速滚动的情境下可能会出现一次多个吸顶的ViewHolder出栈的情况，这个时候需要
+     * 根据LayoutPosition清理栈顶，保证栈内ViewHolder和列表当前的状态一致。
      *
      * @param layoutPosition 大于position的内容会被清理
      */

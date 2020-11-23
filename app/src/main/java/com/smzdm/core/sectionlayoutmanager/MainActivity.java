@@ -3,6 +3,7 @@ package com.smzdm.core.sectionlayoutmanager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.ViewGroup;
+import android.webkit.WebView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -23,8 +24,11 @@ public class MainActivity extends AppCompatActivity {
         rlv.setAdapter(new MyAdapter());
         rlv.setLayoutManager(new SectionLayoutManager(this));
         findViewById(R.id.btn).setOnClickListener(v ->
-//                rlv.getAdapter().notifyDataSetChanged()
-                        rlv.scrollToPosition(10)
+//                rlv.getLayoutManager().removeAndRecycleViewAt(0,rlv.getLayoutManager().)
+                rlv.getAdapter().notifyDataSetChanged()
+//                        rlv.scrollToPosition(10)
+//                rlv.smoothScrollToPosition(35)
+//                rlv.getAdapter().notifyItemChanged(44)
         );
     }
 
@@ -38,7 +42,6 @@ public class MainActivity extends AppCompatActivity {
                 if (sectionViewHolder == null) {
                     sectionViewHolder = new SectionViewHolder(parent);
                 }
-                boolean b = sectionViewHolder.itemView.isAttachedToWindow();
                 return new SectionViewHolder(parent);
             }
             return new ItemViewHolder(parent);
