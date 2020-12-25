@@ -267,6 +267,9 @@ public class StickLayoutManager extends LinearLayoutManager {
             }
             if (oldLayoutPosition >= positionEnd && !viewHolder.itemView.isAttachedToWindow()) {
                 viewHolder.offsetPosition(-itemCount, true);
+                if (viewHolder.getLayoutPosition() < 0) {
+                    it.remove();
+                }
             }
         }
     }
