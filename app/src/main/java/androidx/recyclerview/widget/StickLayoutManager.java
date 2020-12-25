@@ -15,9 +15,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 吸顶LayoutManager
- * 注意：
+ * 注意（Attention）：
  * <p>
- * 1. 未处理反向布局问题
+ * 1. 未处理反向布局问题(The condition of reverse is not processed.)
  *
  * @author Rango on 2020/11/17
  */
@@ -51,10 +51,6 @@ public class StickLayoutManager extends LinearLayoutManager {
         @Override
         public void onChanged() {
             super.onChanged();
-            for (RecyclerView.ViewHolder viewHolder : sectionCache) {
-                //update flag 需要更新，不能直接使用
-                viewHolder.addFlags(RecyclerView.ViewHolder.FLAG_UPDATE | RecyclerView.ViewHolder.FLAG_INVALID);
-            }
             sectionCache.clear();
             sectionCacheReset.set(true);
         }
@@ -62,15 +58,6 @@ public class StickLayoutManager extends LinearLayoutManager {
 
     public StickLayoutManager(Context context) {
         super(context);
-    }
-
-    public StickLayoutManager(Context context, int orientation, boolean reverseLayout) {
-        super(context, orientation, reverseLayout);
-    }
-
-    public StickLayoutManager(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
-
     }
 
 
@@ -135,29 +122,6 @@ public class StickLayoutManager extends LinearLayoutManager {
         }
     }
 
-    @Override
-    public void onItemsRemoved(@NonNull RecyclerView recyclerView, int positionStart, int itemCount) {
-        super.onItemsRemoved(recyclerView, positionStart, itemCount);
-        Iterator<RecyclerView.ViewHolder> it = sectionCache.iterator();
-        while (it.hasNext()) {
-            RecyclerView.ViewHolder viewHolder = it.next();
-            int oldLayoutPosition = viewHolder.getLayoutPosition();
-            if (oldLayoutPosition == RecyclerView.NO_POSITION) {
-                removeView(viewHolder.itemView);
-                it.remove();
-                continue;
-            }
-            int positionEnd = (positionStart + itemCount);
-            if (positionStart <= oldLayoutPosition && oldLayoutPosition < positionEnd) {
-                it.remove();
-                continue;
-            }
-            if (oldLayoutPosition >= positionEnd && !viewHolder.itemView.isAttachedToWindow()) {
-                viewHolder.offsetPosition(-itemCount, true);
-            }
-        }
-    }
-
     private void preRelayoutChildren(int dy) {
         //遍历当前屏幕已经显示出来的ViewHolder，并从中过滤出需要吸顶的ViewHolder并将其保存到 sectionCache
         for (int i = 0; i < getChildCount(); i++) {
@@ -168,7 +132,6 @@ public class StickLayoutManager extends LinearLayoutManager {
             }
             if (dy > 0 && vh.itemView.getTop() < dy) {
                 sectionCache.push(vh);
-                Log.i(tag, "搜集：dy=" + dy);
             } else {
                 break;
             }
@@ -182,8 +145,6 @@ public class StickLayoutManager extends LinearLayoutManager {
      */
     private void replaceAttachedViewHolder() {
         for (RecyclerView.ViewHolder removedViewHolder : sectionCache.clearTop(findFirstVisibleItemPosition())) {
-            Log.i(tag, "移除ViewHolder:" + removedViewHolder.toString());
-
             for (int i = 0; i < getChildCount(); i++) {
                 RecyclerView.ViewHolder attachedViewHolder = getViewHolderByView(getChildAt(i));
                 if (removedViewHolder.getLayoutPosition() == attachedViewHolder.getLayoutPosition()) {
@@ -212,12 +173,13 @@ public class StickLayoutManager extends LinearLayoutManager {
                 if (mRecyclerView.getAdapter() instanceof StickAdapter) {
                     StickAdapter stickAdapter = (StickAdapter) mRecyclerView.getAdapter();
                     if (stickAdapter.shouldStick(i)) {
-                        View itemView =mRecyclerView.mRecycler.getViewForPosition(i);
+                        View itemView = mRecyclerView.mRecycler.getViewForPosition(i);
                         sectionCache.push(getViewHolderByView(itemView));
                     }
                 }
             }
         }
+
         //取栈顶第一个显示出来的ViewHolder跟sectionCache中的栈顶ViewHolder做比较，过滤掉相等的情况，防止重复绘制
         RecyclerView.ViewHolder attachedViewHolder = getViewHolderByView(getChildAt(0));
         RecyclerView.ViewHolder cachedSectionViewHolder = sectionCache.peek();
@@ -230,6 +192,9 @@ public class StickLayoutManager extends LinearLayoutManager {
         updateSectionLayout();
     }
 
+    /**
+     * 更新吸顶的ViewHolder
+     */
     private void updateSectionLayout() {
         RecyclerView.ViewHolder section = sectionCache.peek();
         if (section != null) {
@@ -281,6 +246,29 @@ public class StickLayoutManager extends LinearLayoutManager {
 
     private RecyclerView.ViewHolder getViewHolderByView(View view) {
         return RecyclerView.getChildViewHolderInt(view);
+    }
+
+    @Override
+    public void onItemsRemoved(@NonNull RecyclerView recyclerView, int positionStart, int itemCount) {
+        super.onItemsRemoved(recyclerView, positionStart, itemCount);
+        Iterator<RecyclerView.ViewHolder> it = sectionCache.iterator();
+        while (it.hasNext()) {
+            RecyclerView.ViewHolder viewHolder = it.next();
+            int oldLayoutPosition = viewHolder.getLayoutPosition();
+            if (oldLayoutPosition == RecyclerView.NO_POSITION) {
+                removeView(viewHolder.itemView);
+                it.remove();
+                continue;
+            }
+            int positionEnd = (positionStart + itemCount);
+            if (positionStart <= oldLayoutPosition && oldLayoutPosition < positionEnd) {
+                it.remove();
+                continue;
+            }
+            if (oldLayoutPosition >= positionEnd && !viewHolder.itemView.isAttachedToWindow()) {
+                viewHolder.offsetPosition(-itemCount, true);
+            }
+        }
     }
 
     @Override
