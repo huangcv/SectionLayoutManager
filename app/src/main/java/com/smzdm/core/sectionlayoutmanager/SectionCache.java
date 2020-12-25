@@ -61,4 +61,10 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
         }
         return removedViewHolders;
     }
+
+    @Override
+    public void clear() {
+        super.clear();
+        filterMap.clear();
+    }
 }

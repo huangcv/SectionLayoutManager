@@ -1,0 +1,276 @@
+package androidx.recyclerview.widget;
+
+import android.content.Context;
+import android.util.AttributeSet;
+import android.util.Log;
+import android.view.View;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.smzdm.core.sectionlayoutmanager.SectionCache;
+import com.smzdm.core.sectionlayoutmanager.holders.Section;
+
+import java.util.Iterator;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+/**
+ * 吸顶LayoutManager
+ * 注意：
+ * <p>
+ * 1. 未处理反向布局问题
+ *
+ * @author Rango on 2020/11/17
+ */
+public class StickLayoutManager extends LinearLayoutManager {
+    private final String tag = "StickLayoutManager";
+    /**
+     * 最多吸顶个数
+     */
+    private int maxSectionCount = 1;
+
+    /**
+     * 存储所有 section position
+     * 在滚动的过程中进行更新这个已经实现，记录所有的Section的Position，但是有以下情况需要考虑
+     * 1. adapter.notifyDataSetChanged()一系列方法调用的时候 更新问题
+     * 2. scrollToPosition -- 更新问题
+     * 3. 快速滚动的时候有些ViewHolder的绘制过程是省略的
+     * 4. notifyItemRemoved() 使用viewHolder.isInvalid()判断
+     */
+    private SortedSet<Integer> sectionPositions = new TreeSet<>();
+
+    /**
+     * position < firstVisibleItemPosition的SectionViewHolder
+     * 存储已经吸顶的Section（或已经滚动过去的SectionViewHolder）
+     * 思考：
+     * ViewHolder.layoutPosition  和 adapterPosition的思考
+     */
+    private SectionCache sectionCache = new SectionCache();
+
+    public StickLayoutManager(Context context) {
+        super(context);
+    }
+
+    public StickLayoutManager(Context context, int orientation, boolean reverseLayout) {
+        super(context, orientation, reverseLayout);
+    }
+
+    public StickLayoutManager(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        super(context, attrs, defStyleAttr, defStyleRes);
+
+    }
+
+
+    @Override
+    public void onAdapterChanged(@Nullable RecyclerView.Adapter oldAdapter, @Nullable RecyclerView.Adapter newAdapter) {
+        super.onAdapterChanged(oldAdapter, newAdapter);
+        sectionCache.clear();
+        if (oldAdapter != null) {
+            try {
+                oldAdapter.unregisterAdapterDataObserver(adapterDataObserver);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        newAdapter.registerAdapterDataObserver(adapterDataObserver);
+    }
+
+    @Override
+    void setRecyclerView(RecyclerView recyclerView) {
+        super.setRecyclerView(recyclerView);
+        if (recyclerView.getAdapter() != null) {
+            try {
+                recyclerView.getAdapter().unregisterAdapterDataObserver(adapterDataObserver);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            recyclerView.getAdapter().registerAdapterDataObserver(adapterDataObserver);
+        }
+    }
+
+    private final RecyclerView.AdapterDataObserver adapterDataObserver = new RecyclerView.AdapterDataObserver() {
+        @Override
+        public void onChanged() {
+            super.onChanged();
+        }
+    };
+
+    @Override
+    public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
+        removeAllSections();
+        super.onLayoutChildren(recycler, state);
+        updateSectionLayout();
+    }
+
+    @Override
+    public void onItemsChanged(@NonNull RecyclerView recyclerView) {
+        super.onItemsChanged(recyclerView);
+    }
+
+    @Override
+    public void onItemsAdded(@NonNull RecyclerView recyclerView, int positionStart, int itemCount) {
+        super.onItemsAdded(recyclerView, positionStart, itemCount);
+    }
+
+    @Override
+    public void onItemsMoved(@NonNull RecyclerView recyclerView, int from, int to, int itemCount) {
+        super.onItemsMoved(recyclerView, from, to, itemCount);
+    }
+
+    @Override
+    public void onItemsUpdated(@NonNull RecyclerView recyclerView, int positionStart, int itemCount, @Nullable Object payload) {
+        super.onItemsUpdated(recyclerView, positionStart, itemCount, payload);
+    }
+
+    @Override
+    public void onItemsUpdated(@NonNull RecyclerView recyclerView, int positionStart, int itemCount) {
+        super.onItemsUpdated(recyclerView, positionStart, itemCount);
+    }
+
+
+    @Override
+    public void onItemsRemoved(@NonNull RecyclerView recyclerView, int positionStart, int itemCount) {
+        super.onItemsRemoved(recyclerView, positionStart, itemCount);
+        Iterator<RecyclerView.ViewHolder> it = sectionCache.iterator();
+        while (it.hasNext()) {
+            RecyclerView.ViewHolder viewHolder = it.next();
+            int oldLayoutPosition = viewHolder.getLayoutPosition();
+            if (oldLayoutPosition == RecyclerView.NO_POSITION) {
+                removeView(viewHolder.itemView);
+                it.remove();
+                continue;
+            }
+            int positionEnd = (positionStart + itemCount);
+            if (positionStart <= oldLayoutPosition && oldLayoutPosition < positionEnd) {
+                it.remove();
+                continue;
+            }
+            if (oldLayoutPosition >= positionEnd && !viewHolder.itemView.isAttachedToWindow()) {
+//                viewHolder.flagRemovedAndOffsetPosition();
+                viewHolder.offsetPosition(-itemCount, true);
+            }
+            oldLayoutPosition = viewHolder.getLayoutPosition();
+            Log.i("",""+oldLayoutPosition);
+        }
+
+    }
+
+
+    @Override
+    public void scrollToPosition(int position) {
+        scrollToPositionWithOffset(position, 0);
+    }
+
+    @Override
+    public void scrollToPositionWithOffset(int position, int offset) {
+        super.scrollToPositionWithOffset(position, offset);
+    }
+
+    /**
+     * 整体思路，
+     * 在手指上滑（向上滚动 dy > 0）的时候,SectionViewHolder不能进入Holder缓存，需要独立缓存
+     * 在手指下滑（向下滚动 dy < 0）的时候，SectionViewHolder在离开吸顶位置的时候需要将该ViewHolder重新放入缓存池，
+     * 正常显示在列表中
+     *
+     * @param dy       >0 是手指向上滑动
+     * @param recycler
+     * @param state
+     * @return
+     */
+    @Override
+    public int scrollVerticallyBy(int dy, RecyclerView.Recycler recycler, RecyclerView.State state) {
+        //遍历当前屏幕已经显示出来的ViewHolder，并从中过滤出需要吸顶的ViewHolder并将其保存到 sectionCache
+        for (int i = 0; i < getChildCount(); i++) {
+            View itemView = getChildAt(i);
+            RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
+            if (!(vh instanceof Section) || sectionCache.peek() == vh) {
+                continue;
+            }
+            if (dy > 0 && vh.itemView.getTop() < dy) {
+                sectionCache.push(vh);
+                Log.i(tag, "搜集：dy=" + dy);
+            } else {
+                break;
+            }
+        }
+        //拒绝进入系统的回收复用策略
+        removeAllSections();
+
+        //走LinearLayoutManager绘制流程
+        int result = super.scrollVerticallyBy(dy, recycler, state);
+
+        //走LinearLayoutManager绘制流程绘制完成后进行界面二次渲染
+
+        //取栈顶第一个显示出来的ViewHolder跟sectionCache中的栈顶ViewHolder做比较，过滤掉相等的情况，防止重复绘制
+        RecyclerView.ViewHolder vh = getViewHolderByView(getChildAt(0));
+        RecyclerView.ViewHolder attachedSection = sectionCache.peek();
+        if (attachedSection != null && attachedSection.isInvalid()) {
+            int p = attachedSection.getLayoutPosition();
+        }
+        if ((vh instanceof Section)
+                && attachedSection != null
+                && attachedSection.getLayoutPosition() == vh.getLayoutPosition()) {
+            removeViewAt(0);
+        }
+
+        //检查栈顶 -- 同步状态，在向下滚动（手指下滑）的时候，由于吸顶的ViewHolder都没有进入Recycler的缓存，所以在向
+        // 下滚动的时候RecyclerView会重新创建ViewHolder实例，我们需要将其替换为我们自定义缓存中保存的实例。
+        for (RecyclerView.ViewHolder removedViewHolder : sectionCache.clearTop(findFirstVisibleItemPosition())) {
+            Log.i(tag, "移除ViewHolder:" + removedViewHolder.toString());
+
+            for (int i = 0; i < getChildCount(); i++) {
+                RecyclerView.ViewHolder attachedViewHolder = getViewHolderByView(getChildAt(i));
+                if (removedViewHolder.getLayoutPosition() == attachedViewHolder.getLayoutPosition()) {
+                    View attachedItemView = attachedViewHolder.itemView;
+                    int left = attachedItemView.getLeft();
+                    int top = attachedItemView.getTop();
+                    int bottom = attachedItemView.getBottom();
+                    int right = attachedItemView.getRight();
+
+                    removeView(attachedItemView);
+                    addView(removedViewHolder.itemView, i);
+                    removedViewHolder.itemView.layout(left, top, right, bottom);
+                    break;
+                }
+            }
+        }
+        updateSectionLayout();
+        return result;
+    }
+
+    private void updateSectionLayout() {
+        RecyclerView.ViewHolder section = sectionCache.peek();
+        if (section != null) {
+            View itemView = section.itemView;
+            if (!itemView.isAttachedToWindow()) {
+                addView(itemView);
+            }
+            View subItem = getChildAt(1);
+            if (getViewHolderByView(subItem) instanceof Section) {
+                //将当前正在吸顶显示的Section向上顶或向下拉
+                int h = itemView.getMeasuredHeight();
+                int top = Math.min(0, -(h - subItem.getTop()));
+                int bottom = Math.min(h, subItem.getTop());
+                itemView.layout(0, top, itemView.getMeasuredWidth(), bottom);
+            } else {
+                itemView.layout(0, 0, itemView.getMeasuredWidth(), itemView.getMeasuredHeight());
+            }
+        }
+    }
+
+
+    private RecyclerView.ViewHolder getViewHolderByView(View view) {
+        return RecyclerView.getChildViewHolderInt(view);
+    }
+
+    /**
+     * 删除所有的吸顶View
+     */
+    private void removeAllSections() {
+        for (RecyclerView.ViewHolder viewHolder : sectionCache) {
+            removeView(viewHolder.itemView);
+        }
+    }
+}
