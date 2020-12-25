@@ -13,7 +13,7 @@ import com.smzdm.core.sectionlayoutmanager.R;
 /**
  * @author Rango on 2020/11/6
  */
-public class SectionViewHolder extends RecyclerView.ViewHolder implements Section {
+public class SectionViewHolder extends RecyclerView.ViewHolder {
     public TextView tv;
 
     public SectionViewHolder(@NonNull View p) {

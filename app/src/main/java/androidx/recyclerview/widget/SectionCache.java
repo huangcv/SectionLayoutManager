@@ -1,4 +1,4 @@
-package com.smzdm.core.sectionlayoutmanager;
+package androidx.recyclerview.widget;
 
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -15,7 +15,6 @@ import java.util.Stack;
  * @author Rango on 2020/11/17
  */
 public class SectionCache extends Stack<RecyclerView.ViewHolder> {
-
     private Map<Integer, RecyclerView.ViewHolder>
             filterMap = new HashMap<>(16, 64);
 
@@ -26,12 +25,32 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
         }
         int position = item.getLayoutPosition();
         //避免存在重复的Value
-        if (filterMap.containsKey(position)) {
+        if (containsPosition(position)) {
             //返回null说明没有添加成功
             return null;
         }
         filterMap.put(position, item);
         return super.push(item);
+    }
+
+    public void clearInvalidValue(){
+        Iterator<RecyclerView.ViewHolder> it = iterator();
+        while (it.hasNext()) {
+            RecyclerView.ViewHolder viewHolder = it.next();
+            if (!viewHolder.isInvalid()) {
+                it.remove();
+            }
+        }
+    }
+
+    public RecyclerView.ViewHolder getByAdapterPosition(int adapterPosition){
+        return filterMap.get(adapterPosition);
+    }
+
+
+
+    public boolean containsPosition(int position) {
+        return filterMap.containsKey(position) && filterMap.get(position).isInvalid();
     }
 
     @Override

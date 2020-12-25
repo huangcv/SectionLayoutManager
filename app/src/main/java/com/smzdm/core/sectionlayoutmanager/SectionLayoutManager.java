@@ -7,11 +7,11 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.SectionCache;
 
 import com.smzdm.core.sectionlayoutmanager.holders.Section;
 
 import java.lang.reflect.Field;
-import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 

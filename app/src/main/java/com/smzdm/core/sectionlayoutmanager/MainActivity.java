@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn:
-//                rlv.getLayoutManager().removeAndRecycleViewAt(0,rlv.getLayoutManager().)
+                dataSource.remove(0);
                 adapter.notifyDataSetChanged();
                 break;
             case R.id.btnRemove:
@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 dataSource.remove(0);
                 dataSource.remove(0);
-                adapter.notifyItemRangeRemoved(0,2);
+                adapter.notifyItemRangeRemoved(0, 2);
                 break;
             case R.id.btnScroll:
                 rlv.scrollToPosition(((LinearLayoutManager) rlv.getLayoutManager()).findFirstVisibleItemPosition() + 10);
@@ -74,7 +74,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    class MyAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+    class MyAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
+            implements StickLayoutManager.StickAdapter {
 
         public MyAdapter() {
             dataSource.clear();
@@ -93,6 +94,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         @Override
+        public boolean shouldStick(int adapterPosition) {
+            return dataSource.get(adapterPosition).section;
+        }
+
+        @Override
         public int getItemViewType(int position) {
             return dataSource.get(position).section ? 0 : 1;
         }
@@ -104,7 +110,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             if (getItemViewType(position) == 1) {
                 ((ItemViewHolder) holder).tv.setText(data.data + ",\nadapterPosition: " + position);
             } else {
-                ((SectionViewHolder) holder).tv.setText(data.data +":" + position);
+                ((SectionViewHolder) holder).tv.setText(data.data + ":" + position);
             }
         }
 
