@@ -1,6 +1,6 @@
 package androidx.recyclerview.widget;
 
-import androidx.recyclerview.widget.RecyclerView;
+import androidx.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Stack;
 
 /**
- * 吸顶ViewHolder的缓存
+ * 吸顶ViewHolder的缓存, 没有显示出来（已经显示出来的不在次队列中）
  *
  * @author Rango on 2020/11/17
  */
@@ -19,21 +19,25 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
             filterMap = new HashMap<>(16, 64);
 
     @Override
-    public RecyclerView.ViewHolder push(RecyclerView.ViewHolder item) {
-        if (item == null) {
+    public RecyclerView.ViewHolder push(RecyclerView.ViewHolder vh) {
+        if (vh == null) {
             return null;
         }
-        int position = item.getLayoutPosition();
+        //进入缓存队列移除View
+        if (vh.itemView.isAttachedToWindow()) {
+            vh.mOwnerRecyclerView.removeView(vh.itemView);
+        }
+        int position = vh.getLayoutPosition();
         //避免存在重复的Value
         if (containsPosition(position)) {
             //返回null说明没有添加成功
             return null;
         }
-        filterMap.put(position, item);
-        return super.push(item);
+        filterMap.put(position, vh);
+        return super.push(vh);
     }
 
-    public void clearInvalidValue(){
+    public void clearInvalidValue() {
         Iterator<RecyclerView.ViewHolder> it = iterator();
         while (it.hasNext()) {
             RecyclerView.ViewHolder viewHolder = it.next();
@@ -43,14 +47,13 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
         }
     }
 
-    public RecyclerView.ViewHolder getByAdapterPosition(int adapterPosition){
+    public RecyclerView.ViewHolder getByAdapterPosition(int adapterPosition) {
         return filterMap.get(adapterPosition);
     }
 
 
-
     public boolean containsPosition(int position) {
-        return filterMap.containsKey(position) && filterMap.get(position).isInvalid();
+        return filterMap.containsKey(position);
     }
 
     @Override
@@ -79,6 +82,32 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
             }
         }
         return removedViewHolders;
+    }
+
+    /**
+     * 指定出栈个数
+     *
+     * @param count 出栈数量
+     * @return
+     */
+    public List<RecyclerView.ViewHolder> pop(int count) {
+        List<RecyclerView.ViewHolder> result = new LinkedList<>();
+        for (int i = count; i > 0; i--) {
+            if (!isEmpty()) {
+                RecyclerView.ViewHolder viewHolder = pop();
+                filterMap.remove(viewHolder.getLayoutPosition());
+                result.add(viewHolder);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public boolean remove(@Nullable Object o) {
+        if (o instanceof RecyclerView.ViewHolder) {
+            filterMap.remove(((RecyclerView.ViewHolder) o).getLayoutPosition());
+        }
+        return super.remove(o);
     }
 
     @Override

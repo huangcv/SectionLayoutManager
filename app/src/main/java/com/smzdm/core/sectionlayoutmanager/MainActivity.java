@@ -23,7 +23,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private List<DataBean> dataSource = new ArrayList<>(50);
     private MyAdapter adapter = new MyAdapter();
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -106,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
             Log.i(tag, "onBindViewHolder");
+
             DataBean data = dataSource.get(position);
             if (getItemViewType(position) == 1) {
                 ((ItemViewHolder) holder).tv.setText(data.data + ",\nadapterPosition: " + position);
