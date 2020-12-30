@@ -147,13 +147,23 @@ public class StickLayoutManager extends LinearLayoutManager {
      * 下滚动的时候RecyclerView会重新创建ViewHolder实例，我们需要将其替换为我们自定义缓存中保存的实例。
      */
     private void replaceAttachedViewHolder() {
-        for (RecyclerView.ViewHolder removedViewHolder : attachedSectionCache) {
+        Iterator<RecyclerView.ViewHolder> it = attachedSectionCache.iterator();
+        while (it.hasNext()) {
+            RecyclerView.ViewHolder sectionCacheViewHolder = it.next();
+            int sectionLayoutPosition = sectionCacheViewHolder.getLayoutPosition();
             for (int i = 0; i < getChildCount(); i++) {
-                RecyclerView.ViewHolder attachedViewHolder = getViewHolderByView(getChildAt(i));
-                if (removedViewHolder.getLayoutPosition() == attachedViewHolder.getLayoutPosition()) {
-                    View attachedItemView = attachedViewHolder.itemView;
-                    removeView(attachedItemView);
-                    break;
+                RecyclerView.ViewHolder newViewHolder = getViewHolderByView(getChildAt(i));
+                if (sectionLayoutPosition == newViewHolder.getLayoutPosition()) {
+                    removeView(newViewHolder.itemView);
+                    if (newViewHolder.itemView.getTop() > getBaseline()) {
+                        int t = newViewHolder.itemView.getTop();
+                        int l = newViewHolder.itemView.getLeft();
+                        int r = newViewHolder.itemView.getRight();
+                        int b = newViewHolder.itemView.getBottom();
+                        addView(sectionCacheViewHolder.itemView, i);
+                        sectionCacheViewHolder.itemView.layout(l, t, r, b);
+                        it.remove();
+                    }
                 }
             }
         }
