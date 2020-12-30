@@ -105,9 +105,17 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
     @Override
     public boolean remove(@Nullable Object o) {
         if (o instanceof RecyclerView.ViewHolder) {
-            filterMap.remove(((RecyclerView.ViewHolder) o).getLayoutPosition());
+            int key = ((RecyclerView.ViewHolder) o).getLayoutPosition();
+            filterMap.remove(key);
         }
-        return super.remove(o);
+        Iterator<RecyclerView.ViewHolder> it = iterator();
+        int key = ((RecyclerView.ViewHolder) o).getLayoutPosition();
+        while (it.hasNext()) {
+            if (it.next().getLayoutPosition() == key) {
+                it.remove();
+            }
+        }
+        return true;
     }
 
     @Override
