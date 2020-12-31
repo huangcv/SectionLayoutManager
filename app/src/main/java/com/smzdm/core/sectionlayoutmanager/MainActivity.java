@@ -73,8 +73,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    class MyAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
-            implements StickLayoutManager.StickAdapter {
+    class MyAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> implements StickLayoutManager.StickAdapter {
 
         public MyAdapter() {
             dataSource.clear();
