@@ -52,7 +52,7 @@ public class StickLayoutManager extends LinearLayoutManager {
 
     public StickLayoutManager(Context context) {
         super(context);
-        maxSectionCount = 3;
+        maxSectionCount = 2;
     }
 
     public StickLayoutManager(Context context, int stickCount) {
@@ -91,13 +91,17 @@ public class StickLayoutManager extends LinearLayoutManager {
             int top = vh.itemView.getTop() - dy;
             if (top < recycleLine) {
                 if (dy > 0) {
-                    //TODO: 放holder占位解决多吸顶回滚空白问题
                     if (!holderTag.equals(vh.itemView.getTag(holderTag.hashCode()))) {
                         sectionCache.push(vh);
                     }
                     if (top > getPaddingTop()
                             && !holderTag.equals(vh.itemView.getTag(holderTag.hashCode()))) {
-                        View emptyHolder = mRecyclerView.mRecycler.getViewForPosition(vh.getLayoutPosition());
+                        //TODO:这里会添加多个占位View bug
+                        int layoutPosition = vh.getLayoutPosition();
+                        if (!hasEmptyHolder(layoutPosition)) {
+
+                        }
+                        View emptyHolder = mRecyclerView.mRecycler.getViewForPosition(layoutPosition);
                         emptyHolder.setTag(holderTag.hashCode(), holderTag);
                         if (!emptyHolder.isAttachedToWindow()) {
                             addView(emptyHolder, i);
@@ -112,15 +116,20 @@ public class StickLayoutManager extends LinearLayoutManager {
             }
             break;
         }
-        int childCount = getChildCount();
-        for (int i = 0; i < childCount; i++) {
-
-        }
         for (RecyclerView.ViewHolder viewHolder : sectionCache) {
             if (viewHolder.itemView.isAttachedToWindow()) {
                 removeView(viewHolder.itemView);
             }
         }
+    }
+
+    private boolean hasEmptyHolder(int layoutPosition){
+        for (int i = 0; i < getChildCount(); i++) {
+            if (getViewHolderByView(getChildAt(i)).getLayoutPosition() == layoutPosition) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String holderTag = "Holder";
@@ -239,6 +248,7 @@ public class StickLayoutManager extends LinearLayoutManager {
                         addView(sectionCacheViewHolder.itemView, i);
                         sectionCacheViewHolder.itemView.layout(l, t, r, b);
                         it.remove();
+                        break;
                     }
                 }
             }
