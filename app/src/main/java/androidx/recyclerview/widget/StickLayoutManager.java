@@ -6,8 +6,10 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,7 +52,7 @@ public class StickLayoutManager extends LinearLayoutManager {
 
     public StickLayoutManager(Context context) {
         super(context);
-        maxSectionCount = 1;
+        maxSectionCount = 2;
     }
 
     public StickLayoutManager(Context context, int stickCount) {
@@ -73,7 +75,10 @@ public class StickLayoutManager extends LinearLayoutManager {
      * @param dy 滚动距离
      */
     private void preRelayoutChildren(int dy) {
-        int sectionBaseLine = getSectionBaseLine();
+        int recycleLine = getSectionBaseLine();
+        if (attachedSectionCache.size() < maxSectionCount) {
+            recycleLine = measureAttachedSectionHeight();
+        }
         //回收所有的Section防止进入Recycler缓存
         recyclerAllAttachedSection();
         //遍历当前屏幕已经显示出来的ViewHolder，并从中过滤出需要吸顶的ViewHolder并将其保存到 sectionCache
@@ -83,9 +88,24 @@ public class StickLayoutManager extends LinearLayoutManager {
             if (!isSticker(vh)) {
                 continue;
             }
-            if (vh.itemView.getTop() - dy < sectionBaseLine) {
+            int top = vh.itemView.getTop() - dy;
+            if (top < recycleLine) {
                 if (dy > 0) {
-                    sectionCache.push(vh);
+                    //TODO: 放holder占位解决多吸顶回滚空白问题
+                    if (!holderTag.equals(vh.itemView.getTag(holderTag.hashCode()))) {
+                        sectionCache.push(vh);
+                    }
+//                    if (top > getPaddingTop()
+//                            && !holderTag.equals(vh.itemView.getTag(holderTag.hashCode()))) {
+//                        View emptyHolder = mRecyclerView.mRecycler.getViewForPosition(vh.getLayoutPosition());
+//                        emptyHolder.setTag(holderTag.hashCode(), holderTag);
+//                        emptyHolder.setBackgroundColor(Color.RED);
+//                        //emptyHolder.setVisibility(View.INVISIBLE);
+//                        if (!emptyHolder.isAttachedToWindow()) {
+//                            addView(emptyHolder, i - 1);
+//                            emptyHolder.layout(vh.itemView.getLeft(), vh.itemView.getTop(), vh.itemView.getRight(), vh.itemView.getBottom());
+//                        }
+//                    }
                 }
             } else {
                 if (dy < 0) {
@@ -94,27 +114,56 @@ public class StickLayoutManager extends LinearLayoutManager {
             }
             break;
         }
+        for (RecyclerView.ViewHolder viewHolder : sectionCache) {
+            if (viewHolder.itemView.isAttachedToWindow()) {
+                removeView(viewHolder.itemView);
+            }
+        }
+    }
+
+    private String holderTag = "Holder";
+
+
+    static class EmptyHolderView extends View {
+        public EmptyHolderView(Context context) {
+            super(context);
+        }
     }
 
     /**
      * 回收所有的吸顶ViewHolder,阻止进入系统的回收复用策略
      */
     private void recyclerAllAttachedSection() {
+        int sectionHeight = measureAttachedSectionHeight();
         Iterator<RecyclerView.ViewHolder> it = attachedSectionCache.iterator();
         while (it.hasNext()) {
             RecyclerView.ViewHolder vh = it.next();
-            //该方法会detach View
             sectionCache.push(vh);
+            //进入缓存队列移除View
+            if (vh.itemView.isAttachedToWindow()) {
+                vh.mOwnerRecyclerView.removeView(vh.itemView);
+            }
             it.remove();
         }
-        sectionCache.clearTop(findFirstVisibleItemPosition());
+        for (int i = 0; i < getChildCount(); i++) {
+            View itemView = getChildAt(i);
+            if (itemView.getBottom() > sectionHeight) {
+                RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
+                if (vh == null) {
+                    continue;
+                }
+                sectionCache.clearTop(vh.getLayoutPosition());
+                break;
+            }
+        }
+
     }
 
     @Override
     public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
         recyclerAllAttachedSection();
         super.onLayoutChildren(recycler, state);
-        postRelayoutChildren();
+        postRelayoutChildren(0);
     }
 
 
@@ -138,24 +187,54 @@ public class StickLayoutManager extends LinearLayoutManager {
             if (dy > mRecyclerView.getMeasuredHeight() / 2) {
                 //TODO: 一次滑动距离过大需要对缓存的Section进行二次验证，方式数据不同步（防止遗漏，跳跃式滑动）
             }
-            postRelayoutChildren();
+            postRelayoutChildren(dy);
         }
+
+    }
+
+    private List<RecyclerView.ViewHolder> getAllViewHolders() {
+        List<RecyclerView.ViewHolder> holderList = new ArrayList<>();
+        for (int i = 0; i < getChildCount(); i++) {
+            holderList.add(getViewHolderByView(getChildAt(i)));
+        }
+        return holderList;
     }
 
     /**
      * 检查栈顶 -- 同步状态，在向下滚动（手指下滑）的时候，由于吸顶的ViewHolder都没有进入Recycler的缓存，所以在向
      * 下滚动的时候RecyclerView会重新创建ViewHolder实例，我们需要将其替换为我们自定义缓存中保存的实例。
      */
-    private void replaceAttachedViewHolder() {
+    private void replaceAttachedViewHolder(int dy) {
+        if (dy == 0) {
+            return;
+        }
+
         Iterator<RecyclerView.ViewHolder> it = attachedSectionCache.iterator();
         while (it.hasNext()) {
             RecyclerView.ViewHolder sectionCacheViewHolder = it.next();
             int sectionLayoutPosition = sectionCacheViewHolder.getLayoutPosition();
-            for (int i = 0; i < getChildCount(); i++) {
-                RecyclerView.ViewHolder newViewHolder = getViewHolderByView(getChildAt(i));
-                if (sectionLayoutPosition == newViewHolder.getLayoutPosition()) {
-                    removeView(newViewHolder.itemView);
-                    if (newViewHolder.itemView.getTop() > getBaseline()) {
+            List<RecyclerView.ViewHolder> viewHolders = getAllViewHolders();
+            for (int i = 0; i < viewHolders.size(); i++) {
+                RecyclerView.ViewHolder newViewHolder = viewHolders.get(i);
+                if (sectionCacheViewHolder == newViewHolder) {
+                    continue;
+                }
+                //TODO:这里的替换方案考虑的不周全
+                if (sectionLayoutPosition != newViewHolder.getLayoutPosition()) {
+                    continue;
+                }
+
+                if (dy > 0) {
+                    //手指向上滑动
+                    if (newViewHolder.itemView.getTop() < getPaddingTop()) {
+                        removeView(newViewHolder.itemView);
+                    }
+                    continue;
+                }
+                if (dy < 0) {
+                    //手指向下滑动
+                    if (newViewHolder.itemView.getBottom() > measureAttachedSectionHeight()) {
+                        removeView(newViewHolder.itemView);
                         int t = newViewHolder.itemView.getTop();
                         int l = newViewHolder.itemView.getLeft();
                         int r = newViewHolder.itemView.getRight();
@@ -163,6 +242,8 @@ public class StickLayoutManager extends LinearLayoutManager {
                         addView(sectionCacheViewHolder.itemView, i);
                         sectionCacheViewHolder.itemView.layout(l, t, r, b);
                         it.remove();
+                    } else {
+                        removeView(newViewHolder.itemView);
                     }
                 }
             }
@@ -190,18 +271,18 @@ public class StickLayoutManager extends LinearLayoutManager {
     }
 
 
-    private void removeDuplicateSection() {
-        for (int i = 0; i < getChildCount(); i++) {
-            View itemView = getChildAt(i);
-            RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
-            if (!isSticker(vh)) {
-                continue;
-            }
-            if (attachedSectionCache.contains(vh)) {
-                removeView(itemView);
-            }
-        }
-    }
+//    private void removeDuplicateSection() {
+//        for (int i = 0; i < getChildCount(); i++) {
+//            View itemView = getChildAt(i);
+//            RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
+//            if (!isSticker(vh)) {
+//                continue;
+//            }
+//            if (attachedSectionCache.contains(vh)) {
+//                removeView(itemView);
+//            }
+//        }
+//    }
 
     /**
      * 没有检测到可以吸顶的Section
@@ -223,7 +304,7 @@ public class StickLayoutManager extends LinearLayoutManager {
     /**
      * 重布局
      */
-    private void postRelayoutChildren() {
+    private void postRelayoutChildren(int dy) {
         if (sectionCacheResetFlag.getAndSet(false)) {
             recollectSections();
         }
@@ -231,22 +312,29 @@ public class StickLayoutManager extends LinearLayoutManager {
         if (hasNoSections()) {
             return;
         }
+        for (RecyclerView.ViewHolder viewHolder : sectionCache.pop(maxSectionCount)) {
+            attachedSectionCache.addFirst(viewHolder);
+        }
 
-        attachedSectionCache.addAll(sectionCache.pop(maxSectionCount));
+        replaceAttachedViewHolder(dy);
 
-        replaceAttachedViewHolder();
+        //removeDuplicateSection();
 
-        removeDuplicateSection();
-
-        int sectionLayoutBaseLine = getSectionBaseLine();
+        int sectionLayoutStartLine = getPaddingTop();
         int sectionMeasuredHeight = measureAttachedSectionHeight();
         for (int i = 0; i < getChildCount(); i++) {
             View itemView = getChildAt(i);
             RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
-            if (isSticker(vh) && itemView.getTop() < sectionMeasuredHeight) {
-                sectionLayoutBaseLine = itemView.getTop() - sectionMeasuredHeight;
-                break;
+            if (!isSticker(vh) ) {
+                continue;
             }
+            if (dy > 0) {
+                if (itemView.getTop() < sectionMeasuredHeight) {
+                    sectionLayoutStartLine = itemView.getTop() - sectionMeasuredHeight;
+                    break;
+                }
+            }
+
         }
 
         for (RecyclerView.ViewHolder section : attachedSectionCache) {
@@ -257,10 +345,11 @@ public class StickLayoutManager extends LinearLayoutManager {
             if (!itemView.isAttachedToWindow()) {
                 addView(itemView);
             }
-            int top = sectionLayoutBaseLine;
-            int bottom = sectionLayoutBaseLine + itemView.getMeasuredHeight();
+            int top = sectionLayoutStartLine;
+            int bottom = top + itemView.getMeasuredHeight();
             itemView.layout(0, top, itemView.getMeasuredWidth(), bottom);
-            sectionLayoutBaseLine -= itemView.getMeasuredHeight();
+
+            sectionLayoutStartLine += itemView.getMeasuredHeight();
         }
     }
 
@@ -286,6 +375,12 @@ public class StickLayoutManager extends LinearLayoutManager {
                 sectionCache.push(viewHolder);
             }
         }
+
+        for (RecyclerView.ViewHolder viewHolder : sectionCache) {
+            if (viewHolder.itemView.isAttachedToWindow()) {
+                removeView(viewHolder.itemView);
+            }
+        }
     }
 
     private void resetCache() {
@@ -302,6 +397,9 @@ public class StickLayoutManager extends LinearLayoutManager {
      * @return true 是需要吸顶的ViewHolder
      */
     private boolean isSticker(RecyclerView.ViewHolder viewHolder) {
+        if (holderTag.equals(viewHolder.itemView.getTag(holderTag.hashCode()))) {
+            return false;
+        }
         if (viewHolder != null && mRecyclerView.getAdapter() instanceof StickAdapter) {
             return ((StickAdapter) mRecyclerView.getAdapter()).shouldStick(viewHolder.getLayoutPosition());
         } else {

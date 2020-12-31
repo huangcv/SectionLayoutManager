@@ -108,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             DataBean data = dataSource.get(position);
             if (getItemViewType(position) == 1) {
-                ((ItemViewHolder) holder).tv.setText(data.data + ",\nadapterPosition: " + position);
+                ((ItemViewHolder) holder).tv.setText(data.data + ":" + Math.random() + ",\nadapterPosition: " + position);
             } else {
                 ((SectionViewHolder) holder).tv.setText(data.data + ":" + position);
             }

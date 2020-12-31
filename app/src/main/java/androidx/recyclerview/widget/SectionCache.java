@@ -23,10 +23,6 @@ public class SectionCache extends Stack<RecyclerView.ViewHolder> {
         if (vh == null) {
             return null;
         }
-        //进入缓存队列移除View
-        if (vh.itemView.isAttachedToWindow()) {
-            vh.mOwnerRecyclerView.removeView(vh.itemView);
-        }
         int position = vh.getLayoutPosition();
         //避免存在重复的Value
         if (containsPosition(position)) {
