@@ -88,6 +88,9 @@ public class StickLayoutManager extends LinearLayoutManager {
             if (!isSticker(vh)) {
                 continue;
             }
+            if (recyclerCreatePositionHolder(vh)) {
+                continue;
+            }
             int top = vh.itemView.getTop() - dy;
             if (top < recycleLine) {
                 if (dy > 0) {
@@ -123,7 +126,21 @@ public class StickLayoutManager extends LinearLayoutManager {
         }
     }
 
-    private boolean hasEmptyHolder(int layoutPosition){
+    private boolean recyclerCreatePositionHolder(RecyclerView.ViewHolder vh) {
+        for (RecyclerView.ViewHolder viewHolder : attachedSectionCache) {
+            if (viewHolder.getLayoutPosition() == vh.getLayoutPosition()) {
+                return true;
+            }
+        }
+        for (RecyclerView.ViewHolder viewHolder : sectionCache) {
+            if (viewHolder.getLayoutPosition() == vh.getLayoutPosition()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasEmptyHolder(int layoutPosition) {
         for (int i = 0; i < getChildCount(); i++) {
             if (getViewHolderByView(getChildAt(i)).getLayoutPosition() == layoutPosition) {
                 return true;
@@ -275,20 +292,6 @@ public class StickLayoutManager extends LinearLayoutManager {
         return sectionBaseLine;
     }
 
-
-//    private void removeDuplicateSection() {
-//        for (int i = 0; i < getChildCount(); i++) {
-//            View itemView = getChildAt(i);
-//            RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
-//            if (!isSticker(vh)) {
-//                continue;
-//            }
-//            if (attachedSectionCache.contains(vh)) {
-//                removeView(itemView);
-//            }
-//        }
-//    }
-
     /**
      * 没有检测到可以吸顶的Section
      *
@@ -331,6 +334,10 @@ public class StickLayoutManager extends LinearLayoutManager {
             View itemView = getChildAt(i);
             RecyclerView.ViewHolder vh = getViewHolderByView(itemView);
             if (!isSticker(vh)) {
+                continue;
+            }
+            //多吸顶滚动的时候防止排序错乱
+            if (recyclerCreatePositionHolder(vh)) {
                 continue;
             }
             if (dy > 0) {
